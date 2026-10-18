@@ -1,0 +1,13 @@
+/Manifest.toml
+/backend/bin/
+/backend/config.json
+/backend/config_fields.json
+/backend/backend-build.json
+/backend/sanitizer/
+/build/
+/build-*/
+/CMakeUserPresets.json
+/results/
+__pycache__/
+*.py[cod]
+*.partial

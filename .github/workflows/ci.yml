@@ -1,0 +1,57 @@
+name: Build and test
+
+"on":
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Julia ${{ matrix.julia }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            julia: '1.10'
+          - os: ubuntu-latest
+            julia: '1.13.2'
+          - os: macos-15
+            julia: '1.13.2'
+    env:
+      JULIA_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build pkg-config libgmp-dev libeigen3-dev libboost-serialization-dev libnauty-dev
+      - name: Install macOS build dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake ninja pkgconf gmp eigen@3 boost nauty
+          echo "CMAKE_PREFIX_PATH=$(brew --prefix eigen@3):$(brew --prefix)" >> "$GITHUB_ENV"
+      - name: Configure
+        run: cmake --preset release
+      - name: Build
+        run: cmake --build --preset release
+      - name: Native tests
+        run: ctest --preset release
+      - name: Install
+        run: cmake --install build
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: ${{ matrix.julia }}
+      - name: Julia tests
+        run: julia --startup-file=no --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
