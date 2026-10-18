@@ -1,10 +1,13 @@
 PerfectForms.jl
 ===============
 
-Enumerate perfect-form orbits from Julia using Mathieu Dutour Sikiric's
-polyhedral_common C++ code. Export exact forms, minimal vectors, stabilizers,
-facet orbits and labelled neighbours through a separate executable. This
-package needs neither Oscar nor GAP.
+Enumerate perfect-form orbits from Julia using Mathieu Dutour Sikirić's
+polyhedral_common C++ code:
+https://github.com/MathieuDutSik/polyhedral_common
+
+Export exact forms, minimal vectors, stabilizers, facet orbits and labelled
+neighbours through a separate executable. This package needs neither Oscar
+nor GAP.
 
 The current exporter supports binary rational forms and rank-two free lattices
 over maximal real quadratic orders of discriminants 5, 8, 12, 13 and 40.
