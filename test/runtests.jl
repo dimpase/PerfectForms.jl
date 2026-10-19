@@ -13,11 +13,15 @@ include("contracts.jl")
     @test info["executable_sha256"]==B.executable_sha256
     @test info["nauty_provider"]=="SYSTEM"
     @test !isempty(info["nauty_library"])
-    for (D,count) in ((1,1),(5,2),(8,2),(12,3),(13,9),(40,52))
-        result=enumerate_perfect_forms(D;config=B,work_dir=CONTRACT_ROOT,timeout=180.)
+    references=JSON3.read(read(joinpath(@__DIR__,"reference_cases.json"),String))
+    for reference in references["cases"]
+        D=reference["discriminant"];dimension=reference["dimension"]
+        result=enumerate_perfect_forms(D;dimension,config=B,work_dir=CONTRACT_ROOT,timeout=180.)
         @test result.data["completed"]===true
         @test isempty(result.data["pending_facets"])
-        @test length(result.data["representatives"])==count
+        @test length(result.data["representatives"])==reference["orbits"]
+        @test result.data["lattice_dimension"]==reference["lattice_dimension"]
+        @test result.data["form_space_dimension"]==reference["form_space_dimension"]
         @test result.process_info["status"]=="exported_pending_validation"
         @test isfile(joinpath(result.run_directory,"process.json"))
     end
@@ -26,6 +30,8 @@ include("contracts.jl")
     # Loading and running this interface must not pull in the arithmetic stack.
     @test all(id.name ∉ ("Oscar","Hecke","GAP") for id in keys(Base.loaded_modules))
 end
+
+include("generic_inputs.jl")
 
 @testset "installation selection and build provenance" begin
     B=default_backend()

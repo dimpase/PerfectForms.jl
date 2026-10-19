@@ -58,6 +58,8 @@ target_link_libraries(av_backend_headers INTERFACE
 option(AV_ENABLE_SANITIZERS "Instrument the exporter with ASan and UBSan" OFF)
 add_executable(AV_ExportPerfectOrbits backend/export_perfect.cpp)
 target_link_libraries(AV_ExportPerfectOrbits PRIVATE av_backend_headers)
+target_compile_definitions(AV_ExportPerfectOrbits PRIVATE
+  AV_BACKEND_COMMIT="${AV_BACKEND_COMMIT}")
 set_target_properties(AV_ExportPerfectOrbits PROPERTIES
   CXX_EXTENSIONS OFF RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin")
 if(AV_ENABLE_SANITIZERS)
@@ -98,7 +100,8 @@ if(BUILD_TESTING)
   # require no Python interpreter.
   find_package(Python3 3.8 QUIET COMPONENTS Interpreter)
   if(Python3_Interpreter_FOUND)
-    foreach(_case IN ITEMS classical2 D5 D8 D12 D13 D40 rejection)
+    foreach(_case IN ITEMS classical2 classical3 classical4 D5 D8 D12 D13 D40 D33
+        imaginary_D4 imaginary_D3 raw_classical2 default_forms_only rejection)
       add_test(NAME "backend.${_case}"
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test/backend_smoke.py"
           "$<TARGET_FILE:AV_ExportPerfectOrbits>" "${_case}")

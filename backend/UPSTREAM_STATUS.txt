@@ -1,0 +1,103 @@
+Upstream issue resolution review, 2026-10-18
+==========================================
+
+PerfectForms now pins polyhedral_common at
+88ba28d184c49b0f27b83d2dd3681e3adc928629, replacing
+cfcd79dbddf67a494a1c71b776174b190da5209a (17 top-level commits ahead).
+The seven recursive submodule
+revisions are unchanged and remain explicitly checked in pins.json.
+
+All three reported issues have upstream fixes in this revision:
+
+13. ComputeComplex=F was ignored by PERF_SerialPerfectComputation.
+    Fix: 01fae22c6fa3823d351ec38f87c1d2c833b1d345
+    https://github.com/MathieuDutSik/polyhedral_common/issues/13
+    ComputeComplex now controls lower-face construction and participates in
+    cache compatibility. The upstream default is now T; forms-only requests
+    to that driver must explicitly select F. Incompatible queries/options
+    are rejected.
+    Our forms-only endpoint explicitly keeps its own default F, including
+    when a caller's raw namelist omits the flag; a regression checks this.
+
+14. A failed boundary-product check was only printed.
+    Fix: c561222c595009215613f6447e17871a2d66fd20
+    https://github.com/MathieuDutSik/polyhedral_common/issues/14
+    The library now throws when are_product_zeros returns false, preventing
+    the CLI from publishing a successful cache. Boundary computation also
+    requires a full complex.
+
+15. GAP queries mishandled paths with spaces and nonzero child exits.
+    Fix: beede39cfaa9cc8ffa68a0949775597fa11e3ca4
+    https://github.com/MathieuDutSik/polyhedral_common/issues/15
+    Argument lists now pass through Process with quoted positional shell
+    parameters for stderr redirection. PERFCOMP_general_query checks status
+    before reading results and includes stderr in failure diagnostics.
+
+Effect on our implementation
+---------------------------
+
+No upstream source patches remain in this package: CMake consumes pristine
+pinned sources. The earlier audit's source patch had already been removed
+when the build switched to installed system nauty.
+
+The JSON exporter remains our interface implementation. It augments upstream
+adjacency callbacks with the neighbouring Gram matrix, minimal vectors and
+transporter before serializing exact JSON. The fixed standalone driver does
+not supply this JSON protocol or request-token/completion contract. PerfectForms
+calls the upstream enumerator directly; it does not contain a patched copy of
+the full-complex algorithm or GAP query wrapper.
+
+The exporter rejects requests for lower complexes/boundaries because its output
+contains perfect forms and labelled neighbours. This is its API scope, rather
+than an upstream-failure workaround. The Julia runner's deadlines, memory
+limits, executable SHA checks and private request files likewise remain part
+of the executable interface. ArithmeticVoronoi's independent mathematical
+validation and cache checks remain necessary.
+
+The exporter now receives its upstream commit from CMake's verified pin,
+removing a duplicate hardcoded SHA in C++. Changing the pin or executable
+therefore updates provenance and invalidates incompatible arithmetic caches.
+
+Original issue submissions and frozen audit receipts remain historical data
+in ArithmeticVoronoi; they have not been rewritten to describe the new version.
+
+Executed review checks
+----------------------
+
+The unmodified updated sources built with GCC 16.2.0, system nauty 2.9.3,
+one build job and a 10 GiB address-space ceiling. The following passed locally:
+
+* All 14 CTest cases, including the larger D33 reference and the regression
+  for an omitted ComputeComplex flag: 9.18 seconds in total.
+* All 172 Julia assertions for generic inputs, reference counts and process
+  contracts, using the new installed executable and source pin.
+* The upstream D5 CLI returns [2] for ComputeComplex=F and [2,4,5,4,1,0]
+  for T. Omitting the option gives the full complex, as documented upstream.
+* The upstream CLI accepts valid boundaries and rejects boundary computation
+  without a complex. An isolated C++ test specializes are_product_zeros to
+  return false: the original library calls that checker and then throws
+  TerminalException. The test catches the expected exception; this is a
+  controlled failure, not a naturally observed incorrect mathematical boundary.
+* The unmodified GAP query and process helpers return a result for ordinary
+  and spaced executable/request paths. Exit status 7 raises an error carrying
+  the child diagnostic, both with and without a readable result file.
+* Fresh exports for the classical binary case and real quadratic discriminants
+  5, 8, 12, 13 and 40 passed ArithmeticVoronoi's independent exact Oscar/Hecke
+  validation: shortest vectors, relative perfection, complete stabilizers,
+  pairwise inequivalence, exact facets, neighbour transporters and closure.
+  D40 had 52 representatives and 372 labelled neighbours; exporter time was
+  2.0195 seconds and validation time 0.8887 seconds, after Julia initialization
+  and earlier compilation in the same one-thread process. Mathematical caches
+  were fresh for this build. No frozen dataset or report was regenerated.
+
+Local detailed receipts and test sources are in
+build-upstream-review/checks/ (ignored build artifacts), including
+upstream-fixes.json, the boundary_probe.cpp fault-injection harness, and the
+CLI/GAP input and output logs. mathematical-validation.json records the exact
+checks and per-case timings. The original pinned checkout was not modified.
+
+The normal release preset was then configured for the new pin, rebuilt and
+installed in this checkout's backend/ directory. Its executable is byte-for-byte
+identical to the independently reviewed build (SHA256
+af803a3d6c476e06d91fa6615c949cfa7dc494cb01ee0eeb6902e374de79bd8c).
+The default Julia selector and installed build provenance agree on the new pin.

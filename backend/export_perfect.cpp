@@ -105,21 +105,18 @@ int main(int argc,char** argv) {
       throw std::runtime_error("request token must contain 64 lowercase hexadecimal digits");
     std::srand(1);srandom(1);set_random_seed(1);
     FullNamelist input=NAMELIST_GetStandard_ENUMERATE_PERFECT_COMPLEX_TSPACE();
+    // Our forms-only interface keeps its default independently of the full
+    // upstream driver's ComputeComplex=T default.
+    input.get_block_mut("DATA").get_bool_mut("ComputeComplex")=false;
     NAMELIST_ReadNamelistFile(argv[1],input);
     auto const& config=input.get_block("TSPACE");
     auto const& data=input.get_block("DATA");
     if(data.get_string("arithmetic")!="gmp")throw ExportFailure("unsupported_arithmetic","only gmp is compiled into this exporter");
     if(data.get_bool("ComputeBoundary") || data.get_bool("ComputePreImage") || data.get_bool("ComputeComplex"))
       throw ExportFailure("unsupported_operation","exporter enumerates perfect forms and facet orbits only");
-    auto kind=config.get_string("TypeTspace");
-    if(kind!="Classic" && kind!="RealQuad")throw std::runtime_error("unsupported form space");
-    if(kind=="Classic" && config.get_int("ClassicDim")!=2)throw std::runtime_error("only classical rank two is initially supported");
-    if(kind=="RealQuad") {
-      int s=config.get_int("RealImagSum"),p=config.get_int("RealImagProd");
-      if(config.get_int("RealImagDim")!=2 || !((s==1 && (p==-1 || p==-3))||(s==0 && (p==-2 || p==-3 || p==-10))))
-        throw std::runtime_error("only maximal-order discriminants 5, 8, 12, 13 and 40, rank two, are supported");
-      if(config.get_string("ListComm")!="Use_realimag")throw std::runtime_error("K-linear commuting constraint is mandatory");
-    }
+    // Let upstream interpret its T-space types, dimensions, quadratic orders,
+    // commuting constraints and auxiliary files. Tested cases are not an input
+    // whitelist for this generic enumeration interface.
     auto space=ReadTspace<Q,Z,Group>(config,std::cerr);
     phase="enumeration";
     auto heuristics=AllStandardHeuristicSerial<Q,Z>(space.ListMat.size(),std::cerr);
@@ -137,8 +134,9 @@ int main(int argc,char** argv) {
     std::ofstream out(temporary);
     out.exceptions(std::ios::failbit|std::ios::badbit);
     out << "{\"schema\":\"av_polyhedral_export_v1\",\"request_token\":\"" << token
-        << "\",\"backend_commit\":\"cfcd79dbddf67a494a1c71b776174b190da5209a\","
-        << "\"arithmetic\":\"gmp\",\"seed\":1,\"coordinates\":\"grouped rows (x1,x2,y1,y2); classical rows (x1,x2)\","
+        << "\",\"backend_commit\":\"" << AV_BACKEND_COMMIT << "\","
+        << "\"arithmetic\":\"gmp\",\"seed\":1,\"coordinates\":\"upstream T-space basis; quadratic grouped rows (x1,...,xn,y1,...,yn)\","
+        << "\"lattice_dimension\":" << space.n << ",\"form_space_dimension\":" << space.ListMat.size() << ','
         << "\"action\":\"H=M*F*transpose(M); row vectors act by right multiplication\","
         << "\"computed_levels\":[\"perfect_forms\",\"facet_orbits\",\"labelled_neighbours\"],"
         << "\"boundary_square\":\"not_computed\",\"minimal_vector_convention\":\"both signs in conversion_and_duplication order\",\"form_basis\":";

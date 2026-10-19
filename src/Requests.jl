@@ -1,46 +1,97 @@
-"""Build an input namelist for a supported rank-two perfect-form enumeration.
+function namelist_value(value::AbstractString)
+    any(c->iscntrl(c) || c=='!',value) &&
+        throw(ArgumentError("namelist strings cannot contain control characters or the upstream comment character !"))
+    delimiter=!occursin('"',value) ? '"' : !occursin('\'',value) ? '\'' :
+        throw(ArgumentError("upstream namelist strings cannot contain both quote delimiters"))
+    string(delimiter,value,delimiter)
+end
+namelist_value(value::Bool)=value ? "T" : "F"
+namelist_value(value::Integer)=string(value)
+function namelist_value(value::AbstractFloat)
+    isfinite(value) || throw(ArgumentError("namelist numbers must be finite"))
+    string(value)
+end
+namelist_value(value::AbstractVector)=join(namelist_value.(value),", ")
+namelist_value(value)=throw(ArgumentError("unsupported namelist value type: $(typeof(value))"))
 
-`D=1` selects binary rational forms. `D=5,8,12,13,40` selects the free rank-two
-lattice over the maximal real quadratic order of discriminant `D`. Only the
-GMP arithmetic path is implemented by the exporter; other safe arithmetic
-names are accepted here to support explicit backend rejection diagnostics.
-"""
-function perfect_form_request(D::Integer=1;arithmetic="gmp")
-    models=Dict(1=>(0,0),5=>(1,-1),8=>(0,-2),12=>(0,-3),13=>(1,-3),40=>(0,-10))
-    haskey(models,D) || throw(ArgumentError("supported discriminants are 1 (classical rank two), 5, 8, 12, 13 and 40"))
-    root_sum,root_product=models[D]
-    arithmetic in ("gmp","flint","unsupported") || throw(ArgumentError("arithmetic name contains unsupported input characters"))
-    """
-    &TSPACE
-      TypeTspace = "$(D==1 ? "Classic" : "RealQuad")"
-      ClassicDim = 2
-      RealImagDim = 2
-      RealImagSum = $(root_sum)
-      RealImagProd = $(root_product)
-      SuperMatMethod = "NotNeeded"
-      ListComm = "$(D==1 ? "Trivial" : "Use_realimag")"
-      PtGroupMethod = "Trivial"
-      FileListSubspaces = "unset"
-    /
-    &DATA
-      arithmetic = "$arithmetic"
-      OnlyWellRounded = T
-      ComputeComplex = F
-      ComputeBoundary = F
-      ComputePreImage = F
-      CacheFile = "none"
-    /
-    """
+function namelist_block(io,name,defaults,options)
+    values=Dict{String,Any}(defaults)
+    for (key,value) in pairs(options)
+        key=string(key)
+        occursin(r"^[A-Za-z][A-Za-z0-9_]*$",key) || throw(ArgumentError("invalid namelist key: $key"))
+        values[key]=value
+    end
+    println(io,"&",name)
+    for key in sort!(collect(keys(values)))
+        println(io,"  ",key," = ",namelist_value(values[key]))
+    end
+    println(io,"/")
 end
 
-"""Enumerate perfect-form orbits, returning exact JSON data and process diagnostics.
+"""Build a perfect-form enumeration request from upstream T-space options.
 
-Return `(data, raw, run_directory, process_info)`. Rational numbers and matrix
-entries in `data` are exact strings, not floating-point approximations. This
-checks the executable protocol and completion marker; independent mathematical
-validation and arithmetic presentations are provided by ArithmeticVoronoi.
-Resource and output keywords are passed to [`run_exporter`](@ref).
+`tspace` and `data` accept a named tuple or dictionary using upstream option
+names. T-space types, dimensions, field polynomials and file inputs are passed
+to upstream without a package-specific whitelist. Use absolute paths for
+auxiliary files: the child runs in a private request directory.
+
+The default selects classical binary forms and GMP arithmetic. The compiled
+exporter implements perfect-form/facet enumeration, not lower complexes.
 """
-function enumerate_perfect_forms(D::Integer=1;config=default_backend(),kwargs...)
-    run_exporter(perfect_form_request(D),config;kwargs...)
+function perfect_form_request(;tspace=(TypeTspace="Classic",ClassicDim=2),data=(;))
+    io=IOBuffer()
+    namelist_block(io,"TSPACE",Dict("SuperMatMethod"=>"NotNeeded","ListComm"=>"Trivial",
+        "PtGroupMethod"=>"Trivial","FileListSubspaces"=>"unset"),tspace)
+    namelist_block(io,"DATA",Dict{String,Any}("arithmetic"=>"gmp","OnlyWellRounded"=>true,
+        "ComputeComplex"=>false,"ComputeBoundary"=>false,"ComputePreImage"=>false,
+        "CacheFile"=>"none"),data)
+    String(take!(io))
+end
+
+"""Build a request for a quadratic order of discriminant `D`, in any rank.
+
+Use `D=1` for classical rational forms. Positive and negative nonsquare
+discriminants congruent to 0 or 1 modulo 4 select real and imaginary quadratic
+orders, respectively. Fundamental discriminants select maximal orders; a
+nonfundamental discriminant describes the corresponding nonmaximal order.
+`dimension` defaults to two. No list of tested fields limits accepted inputs.
+Use the keyword-only method for an arbitrary upstream T-space description.
+"""
+function perfect_form_request(D::Integer;dimension::Integer=2,arithmetic="gmp")
+    dimension>0 || throw(ArgumentError("dimension must be positive"))
+    if D==1
+        return perfect_form_request(;tspace=(TypeTspace="Classic",ClassicDim=dimension),
+            data=(;arithmetic))
+    end
+    D!=0 && mod(D,4) in (0,1) && (D<0 || isqrt(D)^2!=D) ||
+        throw(ArgumentError("a nonsquare quadratic-order discriminant congruent to 0 or 1 modulo 4 is required"))
+    root_sum=mod(D,4)==1 ? 1 : 0
+    root_product=div(root_sum-big(D),4) # root_sum is either 0 or 1, so root_sum^2=root_sum.
+    perfect_form_request(;tspace=(TypeTspace=D>0 ? "RealQuad" : "ImagQuad",
+        RealImagDim=dimension,RealImagSum=root_sum,RealImagProd=root_product,
+        ListComm="Use_realimag"),data=(;arithmetic))
+end
+
+"""Enumerate perfect forms from an upstream namelist or quadratic discriminant.
+
+`enumerate_perfect_forms(input_text; config, ...)` passes a namelist unchanged
+to the exporter. `enumerate_perfect_forms(D; dimension=2, config, ...)` uses
+the quadratic-order convenience constructor; `D=1` selects classical forms.
+With no positional argument, pass upstream options as `tspace` and `data`.
+
+Return `(data, raw, run_directory, process_info)` after checking the process
+and export protocol. Exact numeric values remain JSON strings. Mathematical
+validation is the caller's responsibility. Remaining keywords control
+[`run_exporter`](@ref), including its deadline and memory budget.
+"""
+function enumerate_perfect_forms(input_text::AbstractString;config=default_backend(),kwargs...)
+    run_exporter(input_text,config;kwargs...)
+end
+function enumerate_perfect_forms(D::Integer;dimension::Integer=2,arithmetic="gmp",
+                                 config=default_backend(),kwargs...)
+    run_exporter(perfect_form_request(D;dimension,arithmetic),config;kwargs...)
+end
+function enumerate_perfect_forms(;tspace=(TypeTspace="Classic",ClassicDim=2),data=(;),
+                                 config=default_backend(),kwargs...)
+    run_exporter(perfect_form_request(;tspace,data),config;kwargs...)
 end

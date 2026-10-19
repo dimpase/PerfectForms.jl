@@ -5,7 +5,7 @@ fetches the upstream repository and submodules into the build directory;
 backend/pins.json records their exact revisions.
 
 Repository: https://github.com/MathieuDutSik/polyhedral_common
-Pinned commit: cfcd79dbddf67a494a1c71b776174b190da5209a
+The pinned commit and recursive submodule revisions are recorded in pins.json.
 The upstream GPL version 2 text is retained as UPSTREAM_COPYING for reference.
 Upstream copyright notices remain in the external source checkout. The local
 C++ exporter compiles upstream headers when built; making those sources an
@@ -25,6 +25,8 @@ are preserved in ArithmeticVoronoi:
 https://github.com/dimpase/arithmetic_voronoi/tree/main/upstream_reports
 The Julia adapter invokes this separate executable through typed exact JSON.
 No code was copied from SLnCohomology, HAP, or the Magma implementation.
+UPSTREAM_STATUS.txt records the review of fixes for those three issues and
+explains which parts of this interface remain necessary.
 
 This package was extracted from ArithmeticVoronoi commit
 8f237bb9d311ee64f89b52d24da65ffe290cc5de; our code keeps its existing license

@@ -7,9 +7,11 @@ Export exact forms, minimal vectors, stabilizers, facet orbits and labelled
 neighbours through a separate executable. This package needs neither Oscar
 nor GAP.
 
-The current exporter supports binary rational forms and rank-two free lattices
-over maximal real quadratic orders of discriminants 5, 8, 12, 13 and 40.
-It does not yet expose every dimension or T-space supported by upstream.
+The exporter accepts upstream T-space descriptions, including classical
+forms, real and imaginary quadratic forms, group-invariant spaces and
+spaces supplied by matrix files. Fields and dimensions are not restricted
+to a list of tested examples. The compiled arithmetic path is exact GMP
+integers/rationals; requests for other arithmetic paths are reported explicitly.
 [ArithmeticVoronoi](https://github.com/dimpase/arithmetic_voronoi) provides
 independent exact validation of these exports, two-cells, GL/SL/PSL
 presentations and constructive matrix-to-word algorithms.
@@ -92,8 +94,19 @@ result.process_info["elapsed_seconds"]
 backend_build_info()["nauty_library"]
 ```
 
-Use discriminant 1 for classical binary forms. The other supported
-discriminants are 5, 8, 12, 13 and 40; D8 denotes Q(sqrt(2)), for example.
+The discriminant convenience interface describes quadratic orders in any rank:
+
+```julia
+result = enumerate_perfect_forms(33)             # real quadratic, rank 2
+result = enumerate_perfect_forms(-4)             # Gaussian Hermitian forms
+result = enumerate_perfect_forms(1; dimension=4) # classical rational forms
+```
+
+Discriminant 1 selects classical forms. Otherwise a nonsquare discriminant
+congruent to 0 or 1 modulo 4 selects a real (positive) or imaginary (negative)
+quadratic order. Fundamental discriminants select maximal orders; other order
+discriminants are accepted too. D8 denotes Q(sqrt(2)), for example. The default
+rank is two. Upstream performs its own interpretation and validation.
 The result is a named tuple `(data, raw, run_directory, process_info)`.
 `data` is parsed exact JSON: rational numbers, integer matrix entries and group
 orders remain strings, preserving arbitrary precision. `raw` is the JSON text.
@@ -113,7 +126,28 @@ or relocating a binary; do not edit recorded hashes to accept changed files.
 `backend_build_info(config)` checks the installed `backend-build.json` against
 the selected binary. For an uninstalled build, pass its provenance with `path=`.
 
-For the low-level namelist protocol:
+For general inputs, pass upstream option names in named tuples or dictionaries:
+
+```julia
+result = enumerate_perfect_forms(; tspace=(TypeTspace="ImagQuad",
+    RealImagDim=2, RealImagSum=0, RealImagProd=1, ListComm="Use_realimag"))
+result = enumerate_perfect_forms(; tspace=Dict("TypeTspace"=>"Raw",
+    "FileListMat"=>abspath("form_basis.txt"), "SuperMatMethod"=>"Compute"))
+```
+
+Options in `tspace` and `data` use the upstream `TSPACE` and `DATA` names. There is
+no package-specific list of allowed T-space types or options. Use absolute
+paths for auxiliary inputs, since the child runs in a private request directory.
+For an existing upstream namelist, pass its contents unchanged:
+
+```julia
+result = enumerate_perfect_forms(read("input.nml", String))
+```
+
+PerfectForms defaults to `ComputeComplex=F` even when a raw namelist omits
+that option. The upstream full-complex driver's default is independent.
+
+The equivalent low-level process interface is:
 
 ```julia
 request = perfect_form_request(8)
@@ -142,8 +176,15 @@ After installing the executable:
 julia --startup-file=no --project=. -e 'using Pkg; Pkg.test()'
 ```
 
-CTest exercises all supported inputs and a rejected operation. Julia tests
-exercise the standalone interface, installation selection, SHA checks,
+CTest exercises classical dimensions 2, 3 and 4, real quadratic discriminants
+5, 8, 12, 13, 33 and 40, imaginary quadratic discriminants -3 and -4, a Raw
+file-defined space and a rejected operation. These are regression examples,
+not restrictions on accepted inputs. Published counts and their source
+references are recorded in [test/reference_cases.json](test/reference_cases.json). Native checks also
+verify exact Gram positivity, minimal-vector lengths, classical determinant
+and stabilizer invariants, and the known imaginary Voronoi vertex counts.
+The real quadratic D33 case has 149 orbits and provides a larger CI example.
+Julia tests exercise the standalone interface, installation selection, SHA checks,
 structured errors, deadlines, memory limits, stale/truncated output and paths
 with spaces. CI runs these on Linux and macOS.
 
@@ -166,3 +207,5 @@ This package was extracted from ArithmeticVoronoi commit
 8f237bb9d311ee64f89b52d24da65ffe290cc5de. Our code retains its existing license
 in [LICENSE](LICENSE). Upstream pins, attribution and reference license texts are in
 [backend/NOTICE.txt](backend/NOTICE.txt) and `backend/`. Upstream code is fetched separately.
+[backend/UPSTREAM_STATUS.txt](backend/UPSTREAM_STATUS.txt) reviews the resolutions of our three upstream
+issues, the updated source pin and the parts of the JSON interface retained.

@@ -1,0 +1,20 @@
+{
+  "references": {
+    "classical": "Scheckelhoff, Thalagoda, Yasaki, Perfect forms over imaginary quadratic fields, Table 1 (classical counts); https://arxiv.org/html/2105.00593v1#S2; the A_n and D_4 Gram matrices additionally give exact root-lattice invariants.",
+    "real_quadratic": "Gunnells, Yasaki, Perfect forms over totally real number fields, Table 1; https://arxiv.org/html/0908.3130v1#S6.SS3; D is the field discriminant, and equivalence is GL_2(O).",
+    "imaginary_quadratic": "Yasaki, Hyperbolic tessellations associated to Bianchi groups, Tables 2 and 3; https://arxiv.org/html/0908.1762v2#S4.SS2; d=-1 and d=-3 correspond to discriminants -4 and -3. The respective unique ideal polytopes have 6 and 4 vertices."
+  },
+  "cases": [
+    {"name":"classical2","discriminant":1,"dimension":2,"orbits":1,"lattice_dimension":2,"form_space_dimension":3,"minimal_vector_counts":[6],"stabilizer_orders":[12],"normalized_determinants":["3/4"],"reference":"classical"},
+    {"name":"classical3","discriminant":1,"dimension":3,"orbits":1,"lattice_dimension":3,"form_space_dimension":6,"minimal_vector_counts":[12],"stabilizer_orders":[48],"normalized_determinants":["1/2"],"reference":"classical"},
+    {"name":"classical4","discriminant":1,"dimension":4,"orbits":2,"lattice_dimension":4,"form_space_dimension":10,"minimal_vector_counts":[20,24],"stabilizer_orders":[240,1152],"normalized_determinants":["1/4","5/16"],"reference":"classical"},
+    {"name":"D5","discriminant":5,"dimension":2,"orbits":2,"lattice_dimension":4,"form_space_dimension":6,"reference":"real_quadratic"},
+    {"name":"D8","discriminant":8,"dimension":2,"orbits":2,"lattice_dimension":4,"form_space_dimension":6,"reference":"real_quadratic"},
+    {"name":"D12","discriminant":12,"dimension":2,"orbits":3,"lattice_dimension":4,"form_space_dimension":6,"reference":"real_quadratic"},
+    {"name":"D13","discriminant":13,"dimension":2,"orbits":9,"lattice_dimension":4,"form_space_dimension":6,"reference":"real_quadratic"},
+    {"name":"D40","discriminant":40,"dimension":2,"orbits":52,"lattice_dimension":4,"form_space_dimension":6,"reference":"real_quadratic"},
+    {"name":"D33","discriminant":33,"dimension":2,"orbits":149,"lattice_dimension":4,"form_space_dimension":6,"reference":"real_quadratic"},
+    {"name":"imaginary_D4","discriminant":-4,"dimension":2,"orbits":1,"lattice_dimension":4,"form_space_dimension":4,"evaluation_ray_counts":[6],"reference":"imaginary_quadratic"},
+    {"name":"imaginary_D3","discriminant":-3,"dimension":2,"orbits":1,"lattice_dimension":4,"form_space_dimension":4,"evaluation_ray_counts":[4],"reference":"imaginary_quadratic"}
+  ]
+}
