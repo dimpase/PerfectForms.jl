@@ -389,3 +389,11 @@ in [LICENSE](LICENSE). Upstream pins, attribution and reference license texts ar
 [backend/NOTICE.txt](backend/NOTICE.txt) and `backend/`. Upstream code is fetched separately.
 [backend/UPSTREAM_STATUS.txt](backend/UPSTREAM_STATUS.txt) reviews the resolutions of our three upstream
 issues, the updated source pin and the parts of the JSON interface retained.
+
+AI assistance was used for the CMake fetch diagnostics, installation
+documentation and registration setup.
+
+## Releasing
+
+Maintainer instructions for registering a release in Julia's General registry
+are in [.github/RELEASING.md](.github/RELEASING.md).
