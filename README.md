@@ -16,71 +16,251 @@ integers/rationals; requests for other arithmetic paths are reported explicitly.
 independent exact validation of these exports, two-cells, GL/SL/PSL
 presentations and constructive matrix-to-word algorithms.
 
-## Install and build
+## Requirements
 
-Requirements: Julia 1.10 or newer, Git, CMake 3.24+, Ninja, `pkg-config`,
+Julia 1.10 or newer, Git, CMake 3.24+, Make or Ninja, `pkg-config`,
 a C++20 compiler and standard library with `std::format`, and development
 headers/libraries for GMP, Eigen 3, Boost.Serialization and nauty/Traces.
 Python 3.8+ is used only for tests. Linux runtime memory limits use `prlimit`
 from util-linux; macOS uses the system `ps` command.
 
-```bash
-git clone https://github.com/dimpase/PerfectForms.jl.git
-cd PerfectForms.jl
-julia --startup-file=no --project=. -e 'using Pkg; Pkg.instantiate()'
-cmake --preset release
-cmake --build --preset release
-ctest --preset release
-cmake --install build
-```
-
-The release preset builds serially with `-O1` and installs in `backend/`.
-On Linux, prefix the build command with `prlimit --as=10737418240` to impose
-a 10 GiB compiler address-space limit. No administrator access is required
-after system dependencies are installed. Loading Julia code does not run CMake.
-
-On macOS install current Xcode Command Line Tools and, with Homebrew:
+Install these dependencies with your system package manager. On macOS, install
+current Xcode Command Line Tools and run:
 
 ```bash
 brew install cmake ninja pkgconf gmp eigen@3 boost nauty
-cmake --preset release \
-  -DCMAKE_PREFIX_PATH="$(brew --prefix eigen@3);$(brew --prefix)"
+export CMAKE_PREFIX_PATH="$(brew --prefix eigen@3):$(brew --prefix)"
 ```
 
-Then continue with the build, test and install commands above. Detection is
-generic: `pkg-config` metadata, `CMAKE_PREFIX_PATH` and ordinary header/library
-searches. An installed nauty is required. If necessary specify
-`Nauty_INCLUDE_DIR` (`traces.h`), `Nauty_CORE_INCLUDE_DIR` (`nauty.h`), and `Nauty_LIBRARY`.
+## Install and run from a checkout
 
-CMake fetches unmodified upstream headers and recursive submodules at the
-exact revisions in [backend/pins.json](backend/pins.json). It verifies every revision and rejects
-tracked modifications. No upstream source or executable is bundled here.
-An existing clean pinned checkout can be used with
+CMake builds and installs the C++ executable. Julia loads the Julia package
+from its project environment. Build and install the backend, then load the
+Julia package as follows.
+
+### 1. Build the backend
+
+For a new checkout:
+
+```bash
+git clone https://github.com/dimpase/PerfectForms.jl.git
+cd PerfectForms.jl
+```
+
+For an existing checkout, enter its root instead, for example
+`cd ~/work/tmp/PerfectForms.jl`. All shell commands in this section run from
+that directory, beside `Project.toml` and `CMakeLists.txt`.
+
+If you have already successfully built `build/bin/AV_ExportPerfectOrbits`,
+continue with step 2. Otherwise:
+
+```bash
+cmake -S . -B build \
+  -DCMAKE_BUILD_TYPE=Release \
+  '-DCMAKE_CXX_FLAGS_RELEASE=-O1 -DNDEBUG' \
+  -DCMAKE_INSTALL_PREFIX="$PWD/backend"
+cmake --build build --parallel 1
+```
+
+The first configure downloads the pinned backend and recursive submodules after
+nauty detection; this can take several minutes. Progress and timings identify
+this stage. Subsequent configures reuse those sources.
+
+### 2. Install the built backend
+
+```bash
+cmake --install build --prefix "$PWD/backend"
+```
+
+Use an **absolute** prefix, as above. `--prefix backend/` records a relative
+executable path in the generated configuration, which the Julia interface rejects.
+This command also overrides `/usr/local` if that was the cached install prefix.
+It installs under your checkout and needs no administrator privileges.
+
+The installed files include:
+
+| Path relative to the checkout | Purpose |
+| --- | --- |
+| `backend/bin/AV_ExportPerfectOrbits` | Native executable |
+| `backend/config.json` | Absolute executable path, SHA256 and upstream revision |
+| `backend/backend-build.json` | Build and dependency information |
+
+Re-run the install command after rebuilding or moving the installation to
+regenerate the paths and hashes.
+
+### 3. Load the Julia package and run a computation
+
+Still in the checkout, run these **shell** commands:
+
+```bash
+unset PERFECT_FORMS_BACKEND_CONFIG
+julia --startup-file=no --project=. -e 'using Pkg; Pkg.instantiate()'
+julia --startup-file=no --project=.
+```
+
+The `unset` removes any earlier backend override. The package then uses
+`backend/config.json` inside the checkout Julia loads. `Pkg.instantiate()`
+installs the Julia dependencies, and `--project=.` selects this checkout's
+environment. See the [Julia environment documentation](https://pkgdocs.julialang.org/v1/environments/).
+
+At the **Julia** prompt:
+
+```julia
+using PerfectForms
+
+pkgdir(PerfectForms)            # the checkout you selected
+default_backend().executable    # <checkout>/backend/bin/AV_ExportPerfectOrbits
+
+result = enumerate_perfect_forms(5)
+length(result.data["representatives"])  # 2
+```
+
+To start Julia from another directory while using this same environment, give
+the checkout's path explicitly, for example:
+
+```bash
+julia --startup-file=no --project="$HOME/work/tmp/PerfectForms.jl"
+```
+
+## Use this checkout from another Julia project
+
+Register the local checkout in the Julia environment that will use it. For your
+default environment, start plain `julia --startup-file=no`. For an application
+project, start `julia --startup-file=no --project=/absolute/path/to/your/project`.
+Select one of those environments before running:
+
+```julia
+using Pkg
+Pkg.develop(path=expanduser("~/work/tmp/PerfectForms.jl"))
+using PerfectForms
+pkgdir(PerfectForms)
+```
+
+Adjust the checkout path if you cloned elsewhere. `Pkg.develop` records that
+directory in the active environment and installs its Julia dependencies.
+Keep the checkout at that location. In subsequent sessions using the same
+environment, load it with `using PerfectForms`.
+See [developing a local Julia package](https://pkgdocs.julialang.org/v1/managing-packages/#Developing-packages).
+
+The backend installed in that checkout's `backend/` remains the default.
+Julia package operations and `using PerfectForms` do not build or install C++.
+
+## Select the backend configuration
+
+Set `PERFECT_FORMS_BACKEND_CONFIG` to the **absolute path of the installed
+`config.json` file**. A value ending in `/backend` names a directory and causes the
+`missing_executable: build and install PerfectForms...` error even when the
+executable has been installed.
+
+For example, to select the checkout's installed backend explicitly, run in the
+**shell before starting Julia**:
+
+```bash
+export PERFECT_FORMS_BACKEND_CONFIG="$HOME/work/tmp/PerfectForms.jl/backend/config.json"
+```
+
+For an **already-running Julia session**, change its own environment instead:
+
+```julia
+ENV["PERFECT_FORMS_BACKEND_CONFIG"] =
+    expanduser("~/work/tmp/PerfectForms.jl/backend/config.json")
+isfile(ENV["PERFECT_FORMS_BACKEND_CONFIG"])  # true
+default_backend().executable
+```
+
+Shell changes do not update the environment of an already-running Julia
+process. To return that session to automatic lookup, run:
+
+```julia
+delete!(ENV, "PERFECT_FORMS_BACKEND_CONFIG")
+default_backend().executable
+```
+
+Lookup order is an explicit `config_path` argument, then
+`ENV["PERFECT_FORMS_BACKEND_CONFIG"]` if set, then
+`backend/config.json` in the loaded PerfectForms package directory.
+Use `expanduser` for `~` in Julia paths; a literal `"~/..."` is not absolute.
+
+This selector also lets another copy of PerfectForms, such as an
+ArithmeticVoronoi dependency, use an existing backend with the matching upstream
+revision. To install in a separate location, run from the built checkout:
+
+```bash
+cmake --install build --prefix "$HOME/.local/opt/perfectforms"
+export PERFECT_FORMS_BACKEND_CONFIG="$HOME/.local/opt/perfectforms/config.json"
+```
+
+## Troubleshooting installation and loading
+
+Inspect the path selected in the **Julia session that reports the error**:
+
+```julia
+using PerfectForms
+selector = get(ENV, "PERFECT_FORMS_BACKEND_CONFIG",
+               joinpath(pkgdir(PerfectForms), "backend", "config.json"))
+@show pkgdir(PerfectForms)
+@show selector isabspath(selector) isfile(selector)
+```
+
+The last two values should both be `true`.
+
+| Error | What to check |
+| --- | --- |
+| Julia cannot find `PerfectForms` | Start with `--project=` pointing to the checkout, or use `Pkg.develop` in the consuming environment. |
+| `config.json needs an absolute path` | The selector is relative. Use an absolute filename, or remove the override to use the default. |
+| `missing_executable: build and install PerfectForms...` | The selected config file is absent or is a directory. Check that the path ends in `/config.json`; run step 2 if the file has not been installed. |
+| `invalid_executable: configure one absolute executable path` | The executable path inside the config is relative. Reinstall using the absolute prefix in step 2. |
+| `executable hash differs from its configured build` | Reinstall the rebuilt executable to regenerate its configuration and hash. |
+
+## Build options
+
+CMake uses `pkg-config`, `CMAKE_PREFIX_PATH` and ordinary header/library searches
+to locate dependencies. An installed nauty is required. If necessary, specify
+`Nauty_INCLUDE_DIR` (`traces.h`), `Nauty_CORE_INCLUDE_DIR` (`nauty.h`) and
+`Nauty_LIBRARY` when configuring.
+
+Build serially to limit compiler memory. On Linux, you can prefix the build
+command with `prlimit --as=10737418240` for a 10 GiB address-space limit.
+The `release` preset provides a Ninja build with the same `-O1` setting and
+`backend/` install prefix. Use it with a fresh build directory; a directory
+already configured for Make must keep its generator.
+
+CMake fetches unmodified upstream headers and recursive submodules at the exact
+revisions in [backend/pins.json](backend/pins.json). It verifies every revision
+and rejects tracked modifications. No upstream source or executable is bundled
+here. Use `-DAV_BACKEND_FETCH_PROGRESS=OFF` to disable extra fetch output; stage
+messages and timings remain. An existing clean pinned checkout can be used with
 `-DFETCHCONTENT_SOURCE_DIR_POLYHEDRAL_COMMON=/absolute/path/to/polyhedral_common`.
 
-To install the Julia package into another environment before registration:
+<details>
+<summary>Build a package installed with Pkg.add, using separate writable directories</summary>
+
+In the consuming Julia project:
 
 ```julia
 using Pkg
 Pkg.add(url="https://github.com/dimpase/PerfectForms.jl.git")
 ```
 
-Build from that installed source into a writable directory with ordinary CMake:
+Then, in a shell at that project's root:
 
 ```bash
-perfect_forms_source="$(julia --project=. -e 'using PerfectForms; print(pkgdir(PerfectForms))')"
-cmake -S "$perfect_forms_source" -B build/perfect-forms -G Ninja \
+perfect_forms_source="$(julia --startup-file=no --project=. -e 'using PerfectForms; print(pkgdir(PerfectForms))')"
+cmake -S "$perfect_forms_source" -B build/perfect-forms \
   -DCMAKE_BUILD_TYPE=Release '-DCMAKE_CXX_FLAGS_RELEASE=-O1 -DNDEBUG' \
   -DCMAKE_INSTALL_PREFIX="$PWD/backend-install"
 cmake --build build/perfect-forms --parallel 1
-ctest --test-dir build/perfect-forms --output-on-failure
-cmake --install build/perfect-forms
+cmake --install build/perfect-forms --prefix "$PWD/backend-install"
 export PERFECT_FORMS_BACKEND_CONFIG="$PWD/backend-install/config.json"
+julia --startup-file=no --project=.
 ```
 
-Use the environment containing PerfectForms with `--project=.` in that example.
-This also works for read-only Julia package source directories. Set Homebrew
-prefixes as above when configuring on macOS.
+At the Julia prompt, run `using PerfectForms`, then
+`default_backend().executable` and the computation in step 3. This workflow
+also supports read-only package source directories. On macOS, set
+`CMAKE_PREFIX_PATH` as described under Requirements before configuring.
+
+</details>
 
 ## Julia interface
 
@@ -119,10 +299,8 @@ result = enumerate_perfect_forms(12; config, timeout=180.0,
     work_dir="results/runs", memory_limit=10*1024^3)
 ```
 
-`default_backend()` uses `PERFECT_FORMS_BACKEND_CONFIG` if set, otherwise this
-checkout's `backend/config.json`. `BackendConfig("/absolute/path/to/executable")`
-is available for an explicitly selected executable. Reinstall after rebuilding
-or relocating a binary; do not edit recorded hashes to accept changed files.
+`BackendConfig("/absolute/path/to/executable")` is also available for an
+explicitly selected executable. Backend selection is described above.
 `backend_build_info(config)` checks the installed `backend-build.json` against
 the selected binary. For an uninstalled build, pass its provenance with `path=`.
 
@@ -170,9 +348,11 @@ for compatibility with saved arithmetic datasets.
 
 ## Tests and provenance
 
-After installing the executable:
+After installing the executable, run from the checkout:
 
 ```bash
+unset PERFECT_FORMS_BACKEND_CONFIG
+ctest --test-dir build --output-on-failure
 julia --startup-file=no --project=. -e 'using Pkg; Pkg.test()'
 ```
 
