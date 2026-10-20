@@ -36,6 +36,8 @@ jobs:
         with:
           version: ${{ matrix.julia }}
       - name: Load Julia package before building the backend
+        env:
+          PERFECT_FORMS_SKIP_BUILD: 'true'
         run: |
           julia --startup-file=no --project=. -e '
             using Pkg
@@ -53,13 +55,15 @@ jobs:
         run: |
           brew install cmake ninja pkgconf gmp eigen@3 boost nauty
           echo "CMAKE_PREFIX_PATH=$(brew --prefix eigen@3):$(brew --prefix)" >> "$GITHUB_ENV"
-      - name: Configure
-        run: cmake --preset release
-      - name: Build
-        run: cmake --build --preset release
-      - name: Native tests
-        run: ctest --preset release
-      - name: Install
-        run: cmake --install build
-      - name: Julia tests
-        run: julia --startup-file=no --project=. -e 'using Pkg; Pkg.test()'
+      - name: Install through Pkg and test the automatic build
+        run: |
+          julia --startup-file=no -e '
+            using Pkg
+            Pkg.activate(; temp=true)
+            Pkg.add(url=pwd())
+            using PerfectForms
+            @assert !isfile(joinpath(pkgdir(PerfectForms), "backend", "config.json"))
+            build_dir = backend_build_info()["build_directory"]
+            run(`ctest --test-dir $build_dir --output-on-failure`)
+            Pkg.test("PerfectForms")
+          '

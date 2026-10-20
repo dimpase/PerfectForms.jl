@@ -8,8 +8,9 @@ include("contracts.jl")
 @testset "standalone enumeration" begin
     B=default_backend()
     pins=JSON3.read(read(joinpath(pkgdir(PerfectForms),"backend","pins.json"),String))
-    @test B.commit==pins["commit"]
     info=backend_build_info(B)
+    @test info["dependency_pins"]["commit"]==pins["commit"]
+    @test info["source_provenance"]["commit"]==B.commit
     @test info["executable_sha256"]==B.executable_sha256
     @test info["nauty_provider"]=="SYSTEM"
     @test !isempty(info["nauty_library"])
@@ -18,6 +19,7 @@ include("contracts.jl")
         D=reference["discriminant"];dimension=reference["dimension"]
         result=enumerate_perfect_forms(D;dimension,config=B,work_dir=CONTRACT_ROOT,timeout=180.)
         @test result.data["completed"]===true
+        @test result.data["backend_source_sha256"]==info["source_sha256"]
         @test isempty(result.data["pending_facets"])
         @test length(result.data["representatives"])==reference["orbits"]
         @test result.data["lattice_dimension"]==reference["lattice_dimension"]
@@ -32,6 +34,7 @@ include("contracts.jl")
 end
 
 include("generic_inputs.jl")
+include("build_support.jl")
 
 @testset "installation selection and build provenance" begin
     B=default_backend()

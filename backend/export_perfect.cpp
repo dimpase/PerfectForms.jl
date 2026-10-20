@@ -135,6 +135,7 @@ int main(int argc,char** argv) {
     out.exceptions(std::ios::failbit|std::ios::badbit);
     out << "{\"schema\":\"av_polyhedral_export_v1\",\"request_token\":\"" << token
         << "\",\"backend_commit\":\"" << AV_BACKEND_COMMIT << "\","
+        << "\"backend_source_sha256\":\"" << AV_BACKEND_SOURCE_SHA256 << "\","
         << "\"arithmetic\":\"gmp\",\"seed\":1,\"coordinates\":\"upstream T-space basis; quadratic grouped rows (x1,...,xn,y1,...,yn)\","
         << "\"lattice_dimension\":" << space.n << ",\"form_space_dimension\":" << space.ListMat.size() << ','
         << "\"action\":\"H=M*F*transpose(M); row vectors act by right multiplication\","

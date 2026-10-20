@@ -9,6 +9,12 @@ const PACKAGE_ROOT=normpath(joinpath(@__DIR__,".."))
 include_dependency(joinpath(PACKAGE_ROOT,"backend","pins.json"))
 const BACKEND_COMMIT=JSON3.read(read(joinpath(PACKAGE_ROOT,"backend","pins.json"),String))["commit"]
 
+"""
+    BackendError
+
+Backend failure with a symbolic `kind`, a human-readable `message`, and a
+`run_directory` containing diagnostics when a request directory was created.
+"""
 struct BackendError <: Exception
     kind::Symbol
     message::String
@@ -36,6 +42,7 @@ function BackendConfig(path::AbstractString;expected_sha256=nothing,commit=BACKE
     BackendConfig(path,actual,commit)
 end
 
+include("BuildPaths.jl")
 include("Configuration.jl")
 include("Requests.jl")
 

@@ -59,7 +59,8 @@ option(AV_ENABLE_SANITIZERS "Instrument the exporter with ASan and UBSan" OFF)
 add_executable(AV_ExportPerfectOrbits backend/export_perfect.cpp)
 target_link_libraries(AV_ExportPerfectOrbits PRIVATE av_backend_headers)
 target_compile_definitions(AV_ExportPerfectOrbits PRIVATE
-  AV_BACKEND_COMMIT="${AV_BACKEND_COMMIT}")
+  AV_BACKEND_COMMIT="${AV_BACKEND_COMMIT}"
+  AV_BACKEND_SOURCE_SHA256="${AV_BACKEND_SOURCE_SHA256}")
 set_target_properties(AV_ExportPerfectOrbits PROPERTIES
   CXX_EXTENSIONS OFF RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin")
 if(AV_ENABLE_SANITIZERS)

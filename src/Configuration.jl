@@ -1,15 +1,32 @@
-"""Select a CMake-installed exporter.
+function default_config_path()
+    override=get(ENV,"PERFECT_FORMS_BACKEND_CONFIG","")
+    !isempty(override) && return override
+    selection=BuildPaths.selection_file(PACKAGE_ROOT)
+    if isfile(selection)
+        data=try JSON3.read(read(selection,String),Dict{String,Any}) catch err
+            throw(BackendError(:invalid_configuration,"invalid build selection: "*sprint(showerror,err)))
+        end
+        get(data,"schema",nothing)=="perfect_forms_build_selection_v1" &&
+            get(data,"config_path",nothing) isa AbstractString ||
+            throw(BackendError(:invalid_configuration,"invalid build selection: $selection"))
+        return data["config_path"]
+    end
+    joinpath(PACKAGE_ROOT,"backend","config.json")
+end
+
+"""Select an installed exporter.
 
 Set `PERFECT_FORMS_BACKEND_CONFIG` to the absolute path of an installed
-`config.json`, or pass `config_path` explicitly. Without an override, use the
-installation in this package checkout's `backend/` directory. Loading the Julia
-package does not download sources or compile C++.
+`config.json`, or pass `config_path` explicitly. Otherwise use the last successful
+`Pkg.build("PerfectForms")` installation for this package checkout/version,
+falling back to the checkout's `backend/config.json` for manual CMake installs.
+An unset or empty environment variable uses this automatic selection.
+Loading the Julia package does not download sources or compile C++.
 """
-function default_backend(;config_path=get(ENV,"PERFECT_FORMS_BACKEND_CONFIG",
-                                         joinpath(PACKAGE_ROOT,"backend","config.json")))
+function default_backend(;config_path=default_config_path())
     isabspath(config_path) || throw(BackendError(:invalid_configuration,"config.json needs an absolute path"))
     isfile(config_path) || throw(BackendError(:missing_executable,
-        "build and install PerfectForms with CMake, then set PERFECT_FORMS_BACKEND_CONFIG to its config.json, or pass BackendConfig(absolute_path)"))
+        "run Pkg.build(\"PerfectForms\"; verbose=true), or set PERFECT_FORMS_BACKEND_CONFIG to an installed config.json file"))
     data=try JSON3.read(read(config_path,String),Dict{String,Any}) catch err
         throw(BackendError(:invalid_configuration,sprint(showerror,err)))
     end

@@ -11,3 +11,6 @@
 __pycache__/
 *.py[cod]
 *.partial
+/docs/Manifest.toml
+/docs/build/
+/deps/build.log
